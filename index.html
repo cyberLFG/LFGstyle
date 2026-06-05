@@ -3,206 +3,338 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>手势粒子互动</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>LFG · 代码实验室</title>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --card-bg: #12121a;
+            --accent: #00f0ff;
+            --accent2: #ff5e9c;
+            --text: #c8c8d4;
+            --text-dim: #6a6a7a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* ───── 背景粒子 ───── */
+        #bg-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.4;
+        }
+
+        /* ───── 主容器 ───── */
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 24px 80px;
+        }
+
+        /* ───── 头部 ───── */
+        .hero {
+            text-align: center;
+            padding: 80px 0 60px;
+        }
+
+        .hero-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            margin-bottom: 24px;
+            box-shadow: 0 0 40px rgba(0,240,255,0.15), 0 0 80px rgba(255,94,156,0.08);
+        }
+
+        .hero h1 {
+            font-size: clamp(28px, 5vw, 48px);
+            font-weight: 700;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            background-size: 200% 100%;
+            animation: shimmer 4s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .hero .tagline {
+            color: var(--text-dim);
+            font-size: 16px;
+            margin-top: 12px;
+            letter-spacing: 1px;
+        }
+
+        .hero .bio {
+            max-width: 560px;
+            margin: 28px auto 0;
+            color: var(--text-dim);
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        /* ───── 分隔 ───── */
+        .section-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: var(--text-dim);
+            margin: 60px 0 24px;
+            text-align: center;
+        }
+
+        /* ───── 项目卡片网格 ───── */
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .project-card {
+            position: relative;
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 28px 24px;
+            border: 1px solid rgba(255,255,255,0.04);
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .project-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 16px;
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            background: linear-gradient(135deg, rgba(0,240,255,0.05), rgba(255,94,156,0.05));
+        }
+
+        .project-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(0,240,255,0.2);
+            box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 0 60px rgba(0,240,255,0.06);
+        }
+
+        .project-card:hover::before { opacity: 1; }
+
+        .card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-icon.gesture {
+            background: linear-gradient(135deg, rgba(0,240,255,0.15), rgba(0,240,255,0.05));
+            color: var(--accent);
+        }
+
+        .card-icon.water {
+            background: linear-gradient(135deg, rgba(100,180,255,0.15), rgba(0,240,255,0.08));
+            color: #64b4ff;
+        }
+
+        .card-icon.future {
+            background: linear-gradient(135deg, rgba(255,94,156,0.12), rgba(255,255,255,0.03));
+            color: var(--text-dim);
+        }
+
+        .card-tag {
+            position: relative;
+            z-index: 1;
+            font-size: 11px;
+            padding: 2px 10px;
+            border-radius: 10px;
+            background: rgba(0,240,255,0.08);
+            color: var(--accent);
+            display: inline-block;
+            align-self: flex-start;
+            letter-spacing: 0.5px;
+        }
+
+        .card-tag.new {
+            background: rgba(255,94,156,0.1);
+            color: var(--accent2);
+        }
+
+        .card-title {
+            position: relative;
+            z-index: 1;
+            font-size: 18px;
+            font-weight: 600;
+            color: #e0e0ea;
+        }
+
+        .card-desc {
+            position: relative;
+            z-index: 1;
+            font-size: 13px;
+            color: var(--text-dim);
+            line-height: 1.6;
+        }
+
+        .card-arrow {
+            position: relative;
+            z-index: 1;
+            align-self: flex-end;
+            font-size: 18px;
+            color: var(--accent);
+            opacity: 0;
+            transform: translateX(-8px);
+            transition: all 0.3s ease;
+        }
+
+        .project-card:hover .card-arrow { opacity: 1; transform: translateX(0); }
+
+        /* ───── Footer ───── */
+        .footer {
+            text-align: center;
+            padding: 60px 0 30px;
+            color: var(--text-dim);
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        /* ───── 响应式 ───── */
+        @media (max-width: 600px) {
+            .container { padding: 40px 16px 60px; }
+            .hero { padding: 40px 0 40px; }
+            .projects-grid { grid-template-columns: 1fr; }
+        }
+    </style>
 </head>
 <body>
 
-    <!-- 加载遮罩 -->
-    <div id="loading-overlay">
-        <div class="loading-spinner"></div>
-        <div id="loading-text">正在初始化...</div>
-    </div>
+    <canvas id="bg-canvas"></canvas>
 
-    <!-- 摄像头画面 -->
-    <div id="camera-container">
-        <video id="camera-video" autoplay playsinline></video>
-    </div>
+    <div class="container">
+        <!-- Hero -->
+        <header class="hero">
+            <div class="hero-avatar">⚡</div>
+            <h1>LFG · 代码实验室</h1>
+            <p class="tagline">探索 · 创造 · 交互</p>
+            <p class="bio">
+                这里记录着我在创意编程、计算机图形学和交互设计领域的实验项目。
+                每一个项目都是一次对技术与美学边界的探索。
+            </p>
+        </header>
 
-    <!-- Three.js 粒子层 -->
-    <!-- 动态创建 -->
+        <!-- 项目列表 -->
+        <div class="section-title">✦ 项目作品</div>
+        <div class="projects-grid">
+            <!-- 水波纹 -->
+            <a href="projects/water-ripple/index.html" class="project-card">
+                <span class="card-tag new">New</span>
+                <div class="card-icon water">💧</div>
+                <h3 class="card-title">水波纹交互</h3>
+                <p class="card-desc">
+                    WebGL 物理模拟 + MediaPipe 手部追踪。手指划过摄像头画面产生涟漪，
+                    支持 LIQUID / CRYSTAL 双模式。
+                </p>
+                <span class="card-arrow">→</span>
+            </a>
 
-    <!-- 2D 画笔层 -->
-    <canvas id="draw-canvas"></canvas>
+            <!-- 手势粒子 -->
+            <a href="projects/gesture-particles/index.html" class="project-card">
+                <span class="card-tag">Three.js</span>
+                <div class="card-icon gesture">🖐️</div>
+                <h3 class="card-title">手势粒子互动</h3>
+                <p class="card-desc">
+                    Three.js 赛博朋克风格粒子系统，支持张开手掌、剪刀手、食指作画、
+                    捏合跟随等多种手势互动效果。
+                </p>
+                <span class="card-arrow">→</span>
+            </a>
 
-    <!-- 右侧面板开关 -->
-    <button id="ui-toggle" title="菜单">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-    </button>
-
-    <!-- 右侧 UI 面板 -->
-    <div id="ui-panel">
-        <!-- 上半部分：手势效果菜单 -->
-        <div class="panel-section">
-            <div class="panel-label">手势效果</div>
-            <div class="gesture-buttons">
-                <button class="gesture-btn" data-gesture="open">
-                    <span class="btn-icon">🖐️</span>
-                    <span class="btn-info">
-                        <span class="btn-title">张开手掌</span>
-                        <span class="btn-desc">粒子乱飞效果</span>
-                    </span>
-                </button>
-                <button class="gesture-btn" data-gesture="peace">
-                    <span class="btn-icon">✌️</span>
-                    <span class="btn-info">
-                        <span class="btn-title">剪刀手</span>
-                        <span class="btn-desc">粒子静止不动</span>
-                    </span>
-                </button>
-                <button class="gesture-btn" data-gesture="point">
-                    <span class="btn-icon">☝️</span>
-                    <span class="btn-info">
-                        <span class="btn-title">食指</span>
-                        <span class="btn-desc">指尖作画</span>
-                    </span>
-                </button>
-                <button class="gesture-btn" data-gesture="pinch">
-                    <span class="btn-icon">🤏</span>
-                    <span class="btn-info">
-                        <span class="btn-title">捏合</span>
-                        <span class="btn-desc">粒子跟随效果</span>
-                    </span>
-                </button>
+            <!-- 占位卡片 -->
+            <div class="project-card" style="opacity:0.5;cursor:default;pointer-events:none;">
+                <span class="card-tag" style="background:rgba(255,255,255,0.03);color:var(--text-dim);">Soon</span>
+                <div class="card-icon future">🔮</div>
+                <h3 class="card-title">敬请期待</h3>
+                <p class="card-desc">更多有趣的实验项目正在筹备中...</p>
             </div>
         </div>
 
-        <hr class="separator">
-
-        <!-- 下半部分：粒子参数 -->
-        <div class="panel-section">
-            <div class="panel-label">粒子参数</div>
-
-            <div class="slider-group">
-                <div class="slider-header">
-                    <span class="slider-name">粒子粗细</span>
-                    <span class="slider-val" id="val-particle-size">0.050</span>
-                </div>
-                <input type="range" id="slider-particle-size" min="0.01" max="0.25" step="0.005" value="0.05">
-            </div>
-
-            <div class="slider-group">
-                <div class="slider-header">
-                    <span class="slider-name">粒子力度</span>
-                    <span class="slider-val" id="val-strength">0.06</span>
-                </div>
-                <input type="range" id="slider-strength" min="0.01" max="0.2" step="0.005" value="0.06">
-            </div>
-
-            <div class="slider-group">
-                <div class="slider-header">
-                    <span class="slider-name">图像范围</span>
-                    <span class="slider-val" id="val-scale">1.0</span>
-                </div>
-                <input type="range" id="slider-scale" min="0.4" max="3" step="0.05" value="1">
-            </div>
-
-            <div class="slider-group">
-                <div class="slider-header">
-                    <span class="slider-name">粒子颜色</span>
-                    <span class="slider-val"></span>
-                </div>
-                <div class="color-row">
-                    <div class="color-picker-wrap">
-                        <input type="color" id="picker-particle-color" value="#00f0ff">
-                    </div>
-                    <span class="slider-name" style="flex:1">主色</span>
-                    <div class="color-picker-wrap">
-                        <input type="color" id="picker-particle-color2" value="#ff00aa">
-                    </div>
-                    <span class="slider-name" style="flex:1">辅色</span>
-                </div>
-            </div>
-
-            <div class="slider-group">
-                <div class="slider-header">
-                    <span class="slider-name">粒子数量</span>
-                    <span class="slider-val" id="val-count">3000</span>
-                </div>
-                <input type="range" id="slider-count" min="500" max="8000" step="100" value="3000">
-            </div>
-        </div>
-
-        <hr class="separator">
-
-        <!-- 画笔参数 -->
-        <div class="panel-section">
-            <div class="panel-label">画笔参数</div>
-
-            <!-- 画笔样式选择器 -->
-            <div class="slider-group">
-                <div class="slider-header">
-                    <span class="slider-name">画笔样式</span>
-                </div>
-                <div class="brush-style-row">
-                    <button class="brush-style-btn active" data-style="pencil">
-                        <span class="brush-icon">✏️</span>
-                        <span>铅笔</span>
-                    </button>
-                    <button class="brush-style-btn" data-style="oil">
-                        <span class="brush-icon">🖌️</span>
-                        <span>油画</span>
-                    </button>
-                    <button class="brush-style-btn" data-style="spray">
-                        <span class="brush-icon">💨</span>
-                        <span>喷枪</span>
-                    </button>
-                    <button class="brush-style-btn" data-style="neon">
-                        <span class="brush-icon">✨</span>
-                        <span>霓虹</span>
-                    </button>
-                </div>
-            </div>
-
-            <div class="slider-group">
-                <div class="slider-header">
-                    <span class="slider-name">画笔粗细</span>
-                    <span class="slider-val" id="val-brush-size">8</span>
-                </div>
-                <input type="range" id="slider-brush-size" min="1" max="40" step="1" value="8">
-            </div>
-
-            <div class="slider-group">
-                <div class="slider-header">
-                    <span class="slider-name">画笔颜色</span>
-                    <span class="slider-val"></span>
-                </div>
-                <div class="color-row">
-                    <div class="color-picker-wrap">
-                        <input type="color" id="picker-brush-color" value="#ff6b9d">
-                    </div>
-                    <span class="slider-name" style="flex:1">选择颜色</span>
-                </div>
-            </div>
-
-            <!-- 笔迹消失开关 -->
-            <div class="slider-group">
-                <div class="checkbox-row">
-                    <label class="checkbox-label" for="chk-fade">
-                        <span class="checkbox-text">笔迹10秒后消失</span>
-                        <div class="toggle-switch">
-                            <input type="checkbox" id="chk-fade" checked>
-                            <span class="toggle-track">
-                                <span class="toggle-thumb"></span>
-                            </span>
-                        </div>
-                    </label>
-                </div>
-            </div>
-        </div>
+        <footer class="footer">
+            Built with curiosity &nbsp;·&nbsp; LFG &copy; 2025
+        </footer>
     </div>
 
-    <!-- 底部手势提示 -->
-    <div id="gesture-hint">伸出手掌，试试不同手势吧 ✋</div>
+    <!-- 背景粒子动画 -->
+    <script>
+    (() => {
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let W, H, particles;
 
-    <!-- ==================== CDN 依赖 ==================== -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js"></script>
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
 
-    <!-- 主程序 -->
-    <script src="js/app.js"></script>
+        particles = Array.from({length: 60}, () => ({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            vx: (Math.random() - 0.5) * 0.3,
+            vy: (Math.random() - 0.5) * 0.3,
+            r: Math.random() * 1.5 + 0.5,
+            alpha: Math.random() * 0.5 + 0.1
+        }));
+
+        function draw() {
+            ctx.clearRect(0, 0, W, H);
+            for (const p of particles) {
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.x < 0) p.x = W;
+                if (p.x > W) p.x = 0;
+                if (p.y < 0) p.y = H;
+                if (p.y > H) p.y = 0;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0,240,255,${p.alpha})`;
+                ctx.fill();
+            }
+            requestAnimationFrame(draw);
+        }
+        draw();
+    })();
+    </script>
 </body>
 </html>
