@@ -13,22 +13,22 @@ const loadText    = document.getElementById('load-text');
 const hintEl      = document.getElementById('hint');
 const btnCamera   = document.getElementById('btn-camera');
 
-const gl = canvas.getContext('webgl', {antialias:false, alpha:false});
+const gl = canvas.getContext('webgl', {antialias:false, alpha:false, preserveDrawingBuffer:false});
 if (!gl) { showErr('WebGL 不可用'); return; }
 
 // ─────────────────── 模式 ───────────────────
 const MODES = {
-  LIQUID:  { speed:.99, atten:.003, refract:.04,  disp:.004, fresnel:.25, depth:.5, specS:.35, specB:.25, drop:.55 },
-  CRYSTAL: { speed:.97, atten:.008, refract:.018, disp:.012, fresnel:.6,  depth:.2, specS:.9,  specB:.4,  drop:.4  }
+  LIQUID:  { speed:.99, atten:.003, refract:.04,  disp:.004, fresnel:.25, depth:.5, specS:.35, specB:.25, drop:.65 },
+  CRYSTAL: { speed:.97, atten:.008, refract:.018, disp:.012, fresnel:.6,  depth:.2, specS:.9,  specB:.4,  drop:.5  }
 };
 let mode = 'LIQUID', mp = MODES[mode];
 
 // ─────────────────── 尺寸 ───────────────────
 let W=0, H=0, texW=0, texH=0, aspect=1;
-const HALF_TEX = 512; // 模拟纹理分辨率上限
+const MAX_TEX = 512;
 
 function calcTexSize(w,h){
-  const s = Math.min(w, h, HALF_TEX * 2);
+  const s = Math.min(w, h, MAX_TEX * 2);
   texW = Math.floor(w * s / Math.max(w,h));
   texH = Math.floor(h * s / Math.max(w,h));
   aspect = w / Math.max(h,1);
@@ -86,6 +86,11 @@ function mkFBO(tex){
   const fb = gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  // 检查完整性
+  const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+  if (status !== gl.FRAMEBUFFER_COMPLETE){
+    console.warn('FBO 不完整:', status);
+  }
   return fb;
 }
 
@@ -109,7 +114,7 @@ void main(){
   vUv = aPos * 0.5 + 0.5;
 }`;
 
-// 物理模拟：波动方程 + 手指 capsule SDF
+// 物理模拟：波动方程
 const SIM_FRAG = `
 precision highp float;
 varying vec2 vUv;
@@ -186,24 +191,30 @@ uniform float uFresnel;
 uniform float uDepth;
 uniform float uSpecS;
 uniform float uSpecB;
+uniform float uMirror;
 
 void main(){
+  // 视频 UV: 前摄像头左右镜像
+  vec2 vidUv = vUv;
+  float isMirror = step(0.5, uMirror);
+  vidUv.x = mix(vidUv.x, 1. - vidUv.x, isMirror);
+
   float h  = texture2D(uHeight, vUv).r;
   float l  = texture2D(uHeight, vUv + vec2(-uTexel.x, 0.)).r;
   float r  = texture2D(uHeight, vUv + vec2( uTexel.x, 0.)).r;
   float d  = texture2D(uHeight, vUv + vec2(0., -uTexel.y)).r;
   float u  = texture2D(uHeight, vUv + vec2(0.,  uTexel.y)).r;
 
-  // 梯度 (强度正比于坡度)
+  // 梯度
   vec2 grad = vec2(r - l, u - d) * 0.5;
 
-  // Laplacian 曲率 → 透镜效果
+  // Laplacian 曲率 鈫?透镜效果
   float curv = (l + r + d + u - 4.*h) * 80.;
 
   // 折射偏移
   vec2 off = grad * uRefract;
 
-  // 色散: RGB 偏移量不同
+  // 色散
   float ratioR = 1. + uDisp;
   float ratioB = 1. - uDisp;
   float lens   = 1. + curv;
@@ -212,9 +223,9 @@ void main(){
   vec2 offG = off * lens;
   vec2 offB = off * ratioB * lens;
 
-  float cr = texture2D(uVideo, vUv + offR).r;
-  float cg = texture2D(uVideo, vUv + offG).g;
-  float cb = texture2D(uVideo, vUv + offB).b;
+  float cr = texture2D(uVideo, vidUv + offR).r;
+  float cg = texture2D(uVideo, vidUv + offG).g;
+  float cb = texture2D(uVideo, vidUv + offB).b;
   vec3 base = vec3(cr, cg, cb);
 
   // 法线
@@ -224,7 +235,7 @@ void main(){
   float NdotV = abs(N.z);
   float fresnel = uFresnel + (1. - uFresnel) * pow(1. - NdotV, 5.);
 
-  // 波深: 波峰暖亮 / 波谷冷暗
+  // 波深
   float wh = h * uDepth * 18.;
   vec3 warm = base + vec3(.1, .03, -.07) * wh;
   vec3 cool = base + vec3(-.06, .0, .1) * (-wh);
@@ -262,23 +273,18 @@ try {
 
 // ─────────────────── FBO / 纹理 ───────────────────
 let texCurr, texPrev, texNext, fbCurr, fbPrev, fbNext, videoTex;
-let texCurr2, texPrev2, texNext2, fbCurr2, fbPrev2, fbNext2; // 双倍精度备用
 
 function initFBOs(){
-  // 删除旧资源
-  [texCurr, texPrev, texNext, videoTex].forEach(t => t && gl.deleteTexture(t));
+  [texCurr, texPrev, texNext].forEach(t => t && gl.deleteTexture(t));
   [fbCurr, fbPrev, fbNext].forEach(f => f && gl.deleteFramebuffer(f));
-  [texCurr2, texPrev2, texNext2].forEach(t => t && gl.deleteTexture(t));
-  [fbCurr2, fbPrev2, fbNext2].forEach(f => f && gl.deleteFramebuffer(f));
+  if (videoTex) gl.deleteTexture(videoTex);
 
   const hasFloat = !!gl.getExtension('OES_texture_float');
-  const fmt  = hasFloat ? gl.RGBA : gl.RGBA;
   const type = hasFloat ? gl.FLOAT : gl.UNSIGNED_BYTE;
-  const internal = hasFloat ? gl.RGBA : gl.RGBA;
 
-  texCurr = mkTexture(texW, texH, internal, fmt, type);
-  texPrev = mkTexture(texW, texH, internal, fmt, type);
-  texNext = mkTexture(texW, texH, internal, fmt, type);
+  texCurr = mkTexture(texW, texH, gl.RGBA, gl.RGBA, type);
+  texPrev = mkTexture(texW, texH, gl.RGBA, gl.RGBA, type);
+  texNext = mkTexture(texW, texH, gl.RGBA, gl.RGBA, type);
   fbCurr  = mkFBO(texCurr);
   fbPrev  = mkFBO(texPrev);
   fbNext  = mkFBO(texNext);
@@ -294,10 +300,16 @@ function initFBOs(){
 
 // ─────────────────── 手指数据 ───────────────────
 const MAX_F = 10;
-let fingerCurr  = new Float32Array(MAX_F * 2); // x,y per finger
-let fingerPrev  = new Float32Array(MAX_F * 2);
-let fingerCount = 0;
-let isFrontCam  = true;
+let handFingersCurr  = new Float32Array(MAX_F * 2);
+let handFingersPrev  = new Float32Array(MAX_F * 2);
+let handFingerCount  = 0;
+
+let autoFingerCurr   = new Float32Array(MAX_F * 2);
+let autoFingerPrev   = new Float32Array(MAX_F * 2);
+let autoFingerCount  = 0;
+let autoFresh        = false; // 自动波纹本帧是否有效
+
+let isFrontCam = true;
 
 // ─────────────────── 模拟步 ───────────────────
 function simStep(){
@@ -318,33 +330,45 @@ function simStep(){
   gl.uniform1f(gl.getUniformLocation(simPrg, 'uAtten'), mp.atten);
   gl.uniform1f(gl.getUniformLocation(simPrg, 'uDrop'),  mp.drop);
   gl.uniform1f(gl.getUniformLocation(simPrg, 'uAspect'), aspect);
-  gl.uniform1f(gl.getUniformLocation(simPrg, 'uCount'),  fingerCount);
 
-  // 打包手指 (cx,cy, px,py) × 10
+  // 合并手指数据: 优先使用真实手指, 没有则用自动波纹
+  let totalFingers = handFingerCount;
+  let useHands = handFingerCount > 0;
+
+  if (!useHands && autoFresh){
+    totalFingers = autoFingerCount;
+  }
+
+  gl.uniform1f(gl.getUniformLocation(simPrg, 'uCount'), totalFingers);
+
   const fg = new Float32Array(MAX_F * 4);
-  for (let i = 0; i < fingerCount; i++){
-    fg[i*4]   = fingerCurr[i*2];
-    fg[i*4+1] = fingerCurr[i*2+1];
-    fg[i*4+2] = fingerPrev[i*2];
-    fg[i*4+3] = fingerPrev[i*2+1];
+  const srcCurr = useHands ? handFingersCurr : autoFingerCurr;
+  const srcPrev = useHands ? handFingersPrev : autoFingerPrev;
+  for (let i = 0; i < totalFingers; i++){
+    fg[i*4]   = srcCurr[i*2];
+    fg[i*4+1] = srcCurr[i*2+1];
+    fg[i*4+2] = srcPrev[i*2];
+    fg[i*4+3] = srcPrev[i*2+1];
   }
   gl.uniform4fv(gl.getUniformLocation(simPrg, 'uFingers'), fg);
 
   drawQuad(simPrg);
 
-  // 旋转: prev ← curr, curr ← next
+  // 旋转
   const tTex = texPrev, tFb = fbPrev;
   texPrev = texCurr; fbPrev = fbCurr;
   texCurr = texNext; fbCurr = fbNext;
   texNext = tTex;    fbNext = tFb;
+
+  // 自动波纹只持续一帧 (下一帧 prev 变为当前, 形成涟漪)
+  autoFresh = false;
 }
 
 // ─────────────────── 渲染步 ───────────────────
 function renderStep(){
-  // 上传视频到纹理
   if (video.readyState >= video.HAVE_CURRENT_DATA){
     gl.bindTexture(gl.TEXTURE_2D, videoTex);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);  // ★ 修复上下颠倒
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
   }
 
@@ -367,6 +391,7 @@ function renderStep(){
   gl.uniform1f(gl.getUniformLocation(renderPrg, 'uDepth'),   mp.depth);
   gl.uniform1f(gl.getUniformLocation(renderPrg, 'uSpecS'),   mp.specS);
   gl.uniform1f(gl.getUniformLocation(renderPrg, 'uSpecB'),   mp.specB);
+  gl.uniform1f(gl.getUniformLocation(renderPrg, 'uMirror'),  isFrontCam ? 1. : 0.);
 
   drawQuad(renderPrg);
 }
@@ -379,31 +404,31 @@ function drawQuad(prg){
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-// ─────────────────── 自动波纹 (无手指时) ───────────────────
-let autoDropTimer = 0;
-function autoDrop(){
-  // 无手指时每 1.8 秒在随机位置产生涟漪作为演示
-  autoDropTimer++;
-  if (fingerCount > 0) { autoDropTimer = 0; return; }
-  if (autoDropTimer < 100) return;
-  autoDropTimer = 0;
+// ─────────────────── 自动波纹 ───────────────────
+let autoTimer = 0;
+function autoRipple(){
+  if (handFingerCount > 0) { autoTimer = 0; return; }
 
-  // 随机位置
-  const cx = 0.3 + Math.random() * 0.4; // 0.3-0.7
-  const cy = 0.3 + Math.random() * 0.4;
-  fingerCount = 1;
-  fingerPrev[0] = fingerCurr[0];
-  fingerPrev[1] = fingerCurr[1];
-  fingerCurr[0] = cx;
-  fingerCurr[1] = cy;
-  // 下一帧自动清掉 (仅在仿真时清)
+  autoTimer++;
+  // 每 60 帧 (~1秒) 生成一个波纹
+  if (autoTimer < 60) return;
+  autoTimer = 0;
+
+  // 保存前一帧位置 = 当前 (同一点, 产生脉冲)
+  const cx = 0.2 + Math.random() * 0.6;
+  const cy = 0.2 + Math.random() * 0.6;
+
+  autoFingerPrev[0] = cx; autoFingerPrev[1] = cy;
+  autoFingerCurr[0] = cx; autoFingerCurr[1] = cy;
+  autoFingerCount = 1;
+  autoFresh = true;
 }
 
 // ─────────────────── MediaPipe ───────────────────
 let hands, camInstance;
 
 function toUV(x, y){
-  return { x: isFrontCam ? (1 - x) : x, y: y };
+  return { x: isFrontCam ? (1. - x) : x, y: y };
 }
 
 function initHands(){
@@ -430,16 +455,16 @@ function initHands(){
         }
       }
 
-      // 保存前一帧
-      fingerPrev.set(fingerCurr);
-      fingerCount = Math.min(tips.length, MAX_F);
-      for (let i = 0; i < fingerCount; i++){
-        fingerCurr[i*2]   = tips[i].x;
-        fingerCurr[i*2+1] = tips[i].y;
+      // 保存前一帧 (上一帧的 curr 变为 prev)
+      handFingersPrev.set(handFingersCurr);
+      handFingerCount = Math.min(tips.length, MAX_F);
+      for (let i = 0; i < handFingerCount; i++){
+        handFingersCurr[i*2]   = tips[i].x;
+        handFingersCurr[i*2+1] = tips[i].y;
       }
       hintEl.style.opacity = '0';
     } else {
-      fingerCount = 0;
+      handFingerCount = 0;
       hintEl.style.opacity = '1';
     }
   });
@@ -454,21 +479,23 @@ function startCam(){
     hintEl.textContent = '手指靠近摄像头划过水面';
   };
 
+  if (camInstance){
+    camInstance.stop().then(() => doStart(done));
+  } else {
+    doStart(done);
+  }
+}
+
+function doStart(done){
   const opts = { width: 640, height: 480 };
   if (isFrontCam) opts.facingMode = 'user';
   else opts.facingMode = 'environment';
 
-  if (camInstance){
-    camInstance.stop().then(() => {
-      camInstance.start(opts).then(done).catch(e => { setLoading('摄像头失败'); console.error(e); });
-    });
-  } else {
-    camInstance = new window.Camera(video, {
-      onFrame: async () => { if (hands) await hands.send({ image: video }); },
-      width: 640, height: 480
-    });
-    camInstance.start(opts).then(done).catch(e => { setLoading('摄像头失败'); console.error(e); });
-  }
+  camInstance = new window.Camera(video, {
+    onFrame: async () => { if (hands) await hands.send({ image: video }); },
+    width: 640, height: 480
+  });
+  camInstance.start(opts).then(done).catch(e => { setLoading('摄像头失败'); console.error(e); });
 }
 
 // ─────────────────── UI ───────────────────
@@ -491,7 +518,7 @@ function loop(){
   requestAnimationFrame(loop);
 
   if (video.readyState >= video.HAVE_CURRENT_DATA){
-    autoDrop();
+    autoRipple();
     simStep();
     renderStep();
   }
