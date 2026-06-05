@@ -176,8 +176,8 @@ float capsuleSDF(vec2 p,vec2 a,vec2 b,float r){
 }
 
 void main(){
-  vec2 step=1./u_texSize;
-  float dx=step.x, dy=step.y;
+  vec2 texel=1./u_texSize;
+  float dx=texel.x, dy=texel.y;
 
   float hC=texture2D(u_curr,v_uv).r;
   float hL=texture2D(u_curr,v_uv+vec2(-dx,0.)).r;
@@ -238,12 +238,12 @@ uniform float u_specS;     // 锐利高光
 uniform float u_specB;     // 柔和高光
 
 void main(){
-  vec2 step=1./u_texSize;
+  vec2 texel=1./u_texSize;
   float h=texture2D(u_height,v_uv).r;
-  float hL=texture2D(u_height,v_uv+vec2(-step.x,0.)).r;
-  float hR=texture2D(u_height,v_uv+vec2(step.x,0.)).r;
-  float hD=texture2D(u_height,v_uv+vec2(0.,-step.y)).r;
-  float hU=texture2D(u_height,v_uv+vec2(0.,step.y)).r;
+  float hL=texture2D(u_height,v_uv+vec2(-texel.x,0.)).r;
+  float hR=texture2D(u_height,v_uv+vec2(texel.x,0.)).r;
+  float hD=texture2D(u_height,v_uv+vec2(0.,-texel.y)).r;
+  float hU=texture2D(u_height,v_uv+vec2(0.,texel.y)).r;
 
   // 梯度 — 直接用坡度驱动偏移（不归一化）
   vec2 grad=vec2(hR-hL,hU-hD)*.5;
