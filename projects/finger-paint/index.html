@@ -35,11 +35,18 @@
         <div class="panel-section">
             <div class="panel-label">手势操作</div>
             <div class="gesture-buttons">
-                <button class="gesture-btn active" data-gesture="point">
+                <button class="gesture-btn active" data-gesture="pinch">
+                    <span class="btn-icon">🤏</span>
+                    <span class="btn-info">
+                        <span class="btn-title">捏合</span>
+                        <span class="btn-desc">写字 / 松开停止</span>
+                    </span>
+                </button>
+                <button class="gesture-btn" data-gesture="point">
                     <span class="btn-icon">☝️</span>
                     <span class="btn-info">
                         <span class="btn-title">食指</span>
-                        <span class="btn-desc">指尖作画</span>
+                        <span class="btn-desc">橡皮擦</span>
                     </span>
                 </button>
                 <button class="gesture-btn" data-gesture="open">
@@ -47,13 +54,6 @@
                     <span class="btn-info">
                         <span class="btn-title">张开手掌</span>
                         <span class="btn-desc">清除画布</span>
-                    </span>
-                </button>
-                <button class="gesture-btn" data-gesture="peace">
-                    <span class="btn-icon">✌️</span>
-                    <span class="btn-info">
-                        <span class="btn-title">剪刀手</span>
-                        <span class="btn-desc">暂停绘画</span>
                     </span>
                 </button>
             </div>
@@ -74,13 +74,13 @@
                         <span class="brush-icon">✏️</span>
                         <span>铅笔</span>
                     </button>
-                    <button class="brush-style-btn" data-style="oil">
+                    <button class="brush-style-btn" data-style="brush">
                         <span class="brush-icon">🖌️</span>
-                        <span>油画</span>
+                        <span>毛笔</span>
                     </button>
-                    <button class="brush-style-btn" data-style="spray">
-                        <span class="brush-icon">💨</span>
-                        <span>喷枪</span>
+                    <button class="brush-style-btn" data-style="emoji">
+                        <span class="brush-icon">😊</span>
+                        <span>随机表情</span>
                     </button>
                     <button class="brush-style-btn" data-style="neon">
                         <span class="brush-icon">✨</span>
@@ -99,6 +99,22 @@
 
             <div class="slider-group">
                 <div class="slider-header">
+                    <span class="slider-name">画笔透明度</span>
+                    <span class="slider-val" id="val-brush-opacity">1.0</span>
+                </div>
+                <input type="range" id="slider-brush-opacity" min="0.1" max="1" step="0.05" value="1">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-name">边缘柔和度</span>
+                    <span class="slider-val" id="val-brush-softness">0.5</span>
+                </div>
+                <input type="range" id="slider-brush-softness" min="0" max="1" step="0.05" value="0.5">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-header">
                     <span class="slider-name">画笔颜色</span>
                     <span class="slider-val"></span>
                 </div>
@@ -113,7 +129,7 @@
             <div class="slider-group">
                 <div class="checkbox-row">
                     <label class="checkbox-label" for="chk-fade">
-                        <span class="checkbox-text">笔迹10秒后消失</span>
+                        <span class="checkbox-text">笔迹6秒后消失</span>
                         <div class="toggle-switch">
                             <input type="checkbox" id="chk-fade" checked>
                             <span class="toggle-track">
@@ -126,7 +142,7 @@
         </div>
     </div>
 
-    <div id="gesture-hint">伸出食指开始作画 ☝️</div>
+    <div id="gesture-hint">捏合手指开始写字 🤏</div>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js"></script>
