@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>指尖画笔</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- 加载遮罩 -->
+    <div id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div id="loading-text">正在初始化...</div>
+    </div>
+
+    <!-- 摄像头画面 -->
+    <div id="camera-container">
+        <video id="camera-video" autoplay playsinline></video>
+    </div>
+
+    <!-- 2D 画笔层 -->
+    <canvas id="draw-canvas"></canvas>
+
+    <!-- 右侧面板开关 -->
+    <button id="ui-toggle" title="菜单">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+    </button>
+
+    <!-- 右侧 UI 面板 -->
+    <div id="ui-panel">
+        <!-- 手势说明 -->
+        <div class="panel-section">
+            <div class="panel-label">手势操作</div>
+            <div class="gesture-buttons">
+                <button class="gesture-btn active" data-gesture="point">
+                    <span class="btn-icon">☝️</span>
+                    <span class="btn-info">
+                        <span class="btn-title">食指</span>
+                        <span class="btn-desc">指尖作画</span>
+                    </span>
+                </button>
+                <button class="gesture-btn" data-gesture="open">
+                    <span class="btn-icon">🖐️</span>
+                    <span class="btn-info">
+                        <span class="btn-title">张开手掌</span>
+                        <span class="btn-desc">清除画布</span>
+                    </span>
+                </button>
+                <button class="gesture-btn" data-gesture="peace">
+                    <span class="btn-icon">✌️</span>
+                    <span class="btn-info">
+                        <span class="btn-title">剪刀手</span>
+                        <span class="btn-desc">暂停绘画</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <hr class="separator">
+
+        <!-- 画笔参数 -->
+        <div class="panel-section">
+            <div class="panel-label">画笔参数</div>
+
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-name">画笔样式</span>
+                </div>
+                <div class="brush-style-row">
+                    <button class="brush-style-btn active" data-style="pencil">
+                        <span class="brush-icon">✏️</span>
+                        <span>铅笔</span>
+                    </button>
+                    <button class="brush-style-btn" data-style="oil">
+                        <span class="brush-icon">🖌️</span>
+                        <span>油画</span>
+                    </button>
+                    <button class="brush-style-btn" data-style="spray">
+                        <span class="brush-icon">💨</span>
+                        <span>喷枪</span>
+                    </button>
+                    <button class="brush-style-btn" data-style="neon">
+                        <span class="brush-icon">✨</span>
+                        <span>霓虹</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-name">画笔粗细</span>
+                    <span class="slider-val" id="val-brush-size">8</span>
+                </div>
+                <input type="range" id="slider-brush-size" min="1" max="40" step="1" value="8">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span class="slider-name">画笔颜色</span>
+                    <span class="slider-val"></span>
+                </div>
+                <div class="color-row">
+                    <div class="color-picker-wrap">
+                        <input type="color" id="picker-brush-color" value="#ff6b9d">
+                    </div>
+                    <span class="slider-name" style="flex:1">选择颜色</span>
+                </div>
+            </div>
+
+            <div class="slider-group">
+                <div class="checkbox-row">
+                    <label class="checkbox-label" for="chk-fade">
+                        <span class="checkbox-text">笔迹10秒后消失</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="chk-fade" checked>
+                            <span class="toggle-track">
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="gesture-hint">伸出食指开始作画 ☝️</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
